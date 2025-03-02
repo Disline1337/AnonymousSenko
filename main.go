@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/flate"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,41 @@ const (
 type File struct {
 	Hash      string
 	Extension string
+}
+
+func Compress(data []byte) []byte {
+	compressed := new(bytes.Buffer)
+
+	writer, err := flate.NewWriter(compressed, flate.BestCompression)
+	if err != nil {
+		panic(err)
+		return nil
+	}
+
+	_, err = writer.Write(data)
+	if err != nil {
+		fmt.Println("Error compressing data:", err)
+		return nil
+	}
+
+	err = writer.Close()
+	if err != nil {
+		fmt.Println("Error closing writer:", err)
+		return nil
+	}
+
+	return compressed.Bytes()
+}
+
+func Decompress(compressed []byte) []byte {
+	reader := bytes.NewReader(compressed)
+	flateReader := flate.NewReader(reader)
+	data, err := io.ReadAll(flateReader)
+	if err != nil {
+		fmt.Println("Error decompressing data:", err)
+		return nil
+	}
+	return data
 }
 
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +89,10 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	defer f.Close()
-	io.Copy(f, file)
+
+	compressed := bytes.NewReader(Compress(file.Bytes()))
+
+	io.Copy(f, compressed)
 	w.Write([]byte(hashSum))
 }
 
@@ -71,10 +110,13 @@ func GetFileHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err) //please dont
 	}
 
+	compressed, _ := io.ReadAll(file)
+	decompressed := bytes.NewReader(Decompress(compressed))
+
 	w.Header().Set("Content-Disposition", "attachment; filename="+fileinfo.Hash+"."+fileinfo.Extension)
 	w.Header().Set("Content-Type", "application/octet-stream")
 
-	io.Copy(w, file)
+	io.Copy(w, decompressed)
 }
 
 func checkFileExists(path string) bool {
