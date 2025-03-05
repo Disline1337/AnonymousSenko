@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>File Upload</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #ff7e5f, #feb47b); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            flex-direction: column; 
+            height: 100vh; 
+            margin: 0; 
+            animation: gradient 15s ease infinite; 
+        }
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .container {
+            width: 80%;
+            max-width: 600px;
+            margin: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            opacity: 0; /* Начальная непрозрачность для анимации */
+            transform: translateY(20px); /* Начальное смещение для анимации */
+            transition: opacity 0.5s ease, transform 0.5s ease; /* Плавный переход */
+            overflow: hidden; /* Скрыть переполнение */
+            height: 0; /* Начальная высота */
+        }
+        .container.show {
+            opacity: 1; /* Полная непрозрачность */
+            transform: translateY(0); /* Возврат в исходное положение */
+        }
+        .button-container {
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: rgba(255, 165, 0, 0.9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s; /* Плавный переход для фона и трансформации */
+            margin: 0 10px;
+            font-size: 16px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        button:hover {
+            background-color: rgba(255, 140, 0, 0.9);
+            transform: scale(1.05); /* Увеличение кнопки при наведении */
+        }
+        form, .file-list { 
+            background: rgba(255, 255, 255, 0.2); 
+            backdrop-filter: blur(10px); 
+            border-radius: 15px; 
+            padding: 30px; 
+            margin-bottom: 20px;
+            opacity: 0; /* Начальная непрозрачность для анимации */
+            transform: translateY(20px); /* Начальное смещение для анимации */
+            transition: opacity 0.5s ease, transform 0.5s ease; /* Плавный переход */
+            display: none; /* Скрыть по умолчанию */
+        }
+        form.show, .file-list.show {
+            opacity: 1; /* Полная непрозрачность */
+            transform: translateY(0); /* Возврат в исходное положение */
+            display: block; /* Показать элемент */
+        }
+        h2 { color: #ffcc00; }
+        .file-list { margin-top: 20px; color: #ffcc00; }
+        .file-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 10px; 
+            border: 1px solid rgba(255, 255, 255, 0.3); 
+            border-radius: 5px; 
+            margin: 5px 0; 
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden; /* Скрыть переполнение */
+        }
+        .file-item span {
+            flex: 1; /* Занять все доступное пространство */
+            text-align: left; /* Выравнивание текста по левому краю */
+            margin-right: 10px; /* Отступ между хешем и кнопкой */
+            white-space: nowrap; /* Запретить перенос строк */
+            overflow: hidden; /* Скрыть переполнение */
+            text-overflow: ellipsis; /* Добавить многоточие для длинного текста */
+        }
+        .copy-button { 
+            background-color: rgba(255, 165, 0, 0.9); 
+            color: white; 
+            border: none; 
+            padding: 5px 10px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            transition: background-color 0.3s;
+        }
+        .copy-button:hover { 
+            background-color: rgba(255, 140, 0, 0.9); 
+        }
+        .custom-file-upload {
+            display: inline-block;
+            background-color: rgba(255, 165, 0, 0.9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        .custom-file-upload:hover {
+            background-color: rgba(255, 140, 0, 0.9);
+        }
+        input[type="file"] {
+            display: none; /* Скрыть стандартный input file */
+        }
+        .senko-image {
+            width: 100%; /* Ширина изображения */
+            max-width: 300px; /* Максимальная ширина изображения */
+            margin-bottom: 20px; /* Отступ снизу */
+            border-radius: 10px; /* Закругление углов изображения */
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+        .pagination button {
+            margin: 0 5px;
+        }
+    </style>
+    <script>
+        let currentView = 'upload'; // Переменная для отслеживания текущего вида
+        const itemsPerPage = 5; // Количество файлов на странице
+        let currentPage = 1; // Текущая страница
+
+        function handleUpload(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            fetch(event.target.action, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.text())
+                .then(hash => {
+                    let fileHashes = getCookie('fileHashes') ? getCookie('fileHashes').split(',') : [];
+                    if (!fileHashes.includes(hash)) {
+                        fileHashes.push(hash);
+                        document.cookie = 'fileHashes=' + fileHashes.join(',') + '; path=/';
+                    }
+                    navigator.clipboard.writeText(hash);
+                    alert('Hash copied to clipboard: ' + hash);
+                    displayFileHashes();
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        function displayFileHashes() {
+            const fileHashes = getCookie('fileHashes') ? getCookie('fileHashes').split(',') : [];
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            // Вычисление индексов для текущей страницы
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedHashes = fileHashes.slice(startIndex, endIndex);
+
+            paginatedHashes.forEach(hash => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `<span>${hash}</span> <button class='copy-button' onclick='copyToClipboard("${hash}")'>Copy Link</button>`;
+                fileList.appendChild(fileItem);
+            });
+
+            // Обновление кнопок пагинации
+            updatePagination(fileHashes.length);
+        }
+
+        function updatePagination(totalItems) {
+            const paginationContainer = document.querySelector('.pagination');
+            paginationContainer.innerHTML = ''; // Очистка предыдущих кнопок
+
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            for (let i = 1; i <= totalPages; i++) {
+                const button = document.createElement('button');
+                button.innerText = i;
+                button.onclick = () => {
+                    currentPage = i; // Установка текущей страницы
+                    displayFileHashes(); // Обновление списка файлов
+                };
+                if (i === currentPage) {
+                    button.disabled = true; // Отключить кнопку текущей страницы
+                }
+                paginationContainer.appendChild(button);
+            }
+        }
+
+        function copyToClipboard(hash) {
+            navigator.clipboard.writeText(hash);
+            alert('Hash copied to clipboard: ' + hash);
+        }
+
+        function lerp(start, end, t) {
+            return start + (end - start) * t; // Линейная интерполяция
+        }
+
+        function animateHeight(container, targetHeight, duration) {
+            const startHeight = container.clientHeight;
+            const startTime = performance.now();
+
+            function animate() {
+                const currentTime = performance.now();
+                const elapsed = (currentTime - startTime) / duration;
+                const t = Math.min(elapsed, 1); // Ограничить t от 0 до 1
+                const newHeight = lerp(startHeight, targetHeight, t);
+                container.style.height = `${newHeight}px`;
+
+                if (t < 1) {
+                    requestAnimationFrame(animate); // Продолжить анимацию
+                } else {
+                    container.style.height = `${targetHeight}px`; // Установить конечную высоту
+                }
+            }
+
+            requestAnimationFrame(animate); // Начать анимацию
+        }
+
+        function showUpload() {
+            currentView = 'upload';
+            const uploadForm = document.getElementById('uploadForm');
+            const fileListContainer = document.getElementById('fileListContainer');
+
+            // Скрыть список файлов и сбросить анимацию
+            fileListContainer.classList.remove('show');
+            fileListContainer.style.display = 'none';
+
+            // Показать форму загрузки и добавить анимацию
+            uploadForm.style.display = 'block';
+            uploadForm.classList.remove('show'); // Сбросить класс анимации
+            setTimeout(() => {
+                uploadForm.classList.add('show'); // Добавить класс для анимации
+            }, 10); // Небольшая задержка для анимации
+
+            // Плавное изменение размера контейнера
+            const container = document.querySelector('.container');
+            container.style.height = 'auto'; // Сброс высоты
+            const newHeight = container.scrollHeight; // Получить новую высоту
+            animateHeight(container, newHeight, 500); // Анимация высоты
+        }
+
+        function showFileList() {
+            currentView = 'fileList';
+            const uploadForm = document.getElementById('uploadForm');
+            const fileListContainer = document.getElementById('fileListContainer');
+
+            // Скрыть форму загрузки и сбросить анимацию
+            uploadForm.classList.remove('show');
+            uploadForm.style.display = 'none';
+
+            // Показать список файлов и добавить анимацию
+            fileListContainer.style.display = 'block';
+            fileListContainer.classList.remove('show'); // Сбросить класс анимации
+            setTimeout(() => {
+                fileListContainer.classList.add('show'); // Добавить класс для анимации
+            }, 10); // Небольшая задержка для анимации
+
+            displayFileHashes(); // Обновление списка хешей
+
+            // Плавное изменение размера контейнера
+            const container = document.querySelector('.container');
+            container.style.height = 'auto'; // Сброс высоты
+            const newHeight = container.scrollHeight; // Получить новую высоту
+            animateHeight(container, newHeight, 500); // Анимация высоты
+        }
+
+        window.onload = function() {
+            showUpload(); // Показать форму загрузки при загрузке страницы
+            document.querySelector('.container').classList.add('show'); // Показать контейнер с анимацией
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <!-- <img src="https://example.com/senko_image.png" alt="Senko" class="senko-image" />  Замените URL на фактический URL изображения -->
+        <div class="button-container">
+            <button onclick="showUpload()">Загрузить файл</button>
+            <button onclick="showFileList()">Все загруженные файлы</button>
+        </div>
+        <form id="uploadForm" enctype="multipart/form-data" action="/upload" method="post" onsubmit="handleUpload(event)" style="display: none;">
+            <h2>Upload Your File</h2>
+            <label class="custom-file-upload">
+                <input type="file" name="upload" required />
+                Выберите файл
+            </label>
+            <input type="submit" value="Upload" class="custom-file-upload" />
+        </form>
+        <div id="fileListContainer" class="file-list" style="display: none;">
+            <h2>Список загруженных файлов</h2>
+            <div id="fileList"></div>
+            <div class="pagination"></div> <!-- Контейнер для кнопок пагинации -->
+        </div>
+    </div>
+</body>
+</html>
