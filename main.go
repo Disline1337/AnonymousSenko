@@ -49,8 +49,8 @@ func Compress(data []byte) []byte {
 
 func Decompress(compressed []byte) []byte {
 	reader := bytes.NewReader(compressed)
-	flateReader := flate.NewReader(reader)
-	data, err := io.ReadAll(flateReader)
+	deflateReader := flate.NewReader(reader)
+	data, err := io.ReadAll(deflateReader)
 	if err != nil {
 		fmt.Println("Error decompressing data:", err)
 		return nil
@@ -58,8 +58,25 @@ func Decompress(compressed []byte) []byte {
 	return data
 }
 
+type Index struct {
+	stat os.FileInfo
+	data []byte
+}
+
+var index Index = Index{
+	stat: nil,
+	data: nil,
+}
+
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\" />\n    <title>Document</title>\n  </head>\n  <body>\n    <form\n      enctype=\"multipart/form-data\"\n      action=\"http://localhost:8080/upload\"\n      method=\"post\"\n    >\n      <input type=\"file\" name=\"upload\" />\n      <input type=\"submit\" value=\"upload\" />\n    </form>\n  </body>\n</html>"))
+	stat, _ := os.Stat("index.html")
+	if index.stat.ModTime() != stat.ModTime() {
+		index.data = make([]byte, stat.Size())
+		index.data, _ = os.ReadFile("index.html")
+		index.stat = stat
+		fmt.Println("index page was reloaded")
+	}
+	w.Write(index.data)
 }
 
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -131,6 +148,10 @@ func main() {
 	if !checkFileExists(DATA_FOLDER) {
 		os.Mkdir(DATA_FOLDER, 0666)
 	}
+
+	index.stat, _ = os.Stat("index.html")
+	index.data = make([]byte, index.stat.Size())
+	index.data, _ = os.ReadFile("index.html")
 
 	http.HandleFunc("/", IndexHandler)
 	http.HandleFunc("/upload", UploadHandler)
