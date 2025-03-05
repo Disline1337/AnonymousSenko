@@ -135,5 +135,6 @@ func main() {
 	http.HandleFunc("/", IndexHandler)
 	http.HandleFunc("/upload", UploadHandler)
 	http.HandleFunc("/get/", GetFileHandler)
-	http.ListenAndServe(":8080", nil)
+	fmt.Println("Starting on 127.0.0.1:7775")
+	http.ListenAndServe("127.0.0.1:7775", nil)
 }
